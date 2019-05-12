@@ -1,6 +1,6 @@
-/*   Jeu de Réflexes
+/*   Jeu de Réflexes (Batak)
      Jérôme Menard
-     Version 1.0 - Mai 2019
+     Version 1.1 - Mai 2019
 */
 
 #include <RedMP3.h>
@@ -10,8 +10,8 @@
 const bool DEBUG = false;
 
 /*
-   Gestion du son
-*/
+ *   Gestion du son
+ */
 #define MP3_RX 19
 #define MP3_TX 18
 MP3 lecteurAudio(MP3_RX, MP3_TX);
@@ -23,8 +23,8 @@ int8_t volume = 0x15;     // 0~0x1e (niveau ajustable)
 #define sonAccueil      0x05    // 0x05 (accueil au démarrage)
 
 /*
-   Gestion de l'afficheur
-*/
+ *   Gestion de l'afficheur
+ */
 #define LCD_RS 13
 #define LCD_EN 12
 #define LCD_D4 11
@@ -44,6 +44,7 @@ class Flasher
   long offTime;
   int ledState;
   unsigned long previousMillis;
+  
 public:
   Flasher(int pin, long on, long off)
   {
@@ -89,8 +90,44 @@ public:
 };
 
 /*
- * Gestion
- * Paramètre onTime (0 : éteinte, -1 : allumée, >0 : clignote)
+ * Bouton
+ */
+class Switch
+{
+  byte switchPin;
+  int lastState;
+public:
+  int state;
+  
+  Switch(int pin)
+  {
+    switchPin = pin;
+    pinMode(switchPin, INPUT);
+    state = LOW;
+    lastState = LOW;
+  }
+  void Update()
+  {
+    if (digitalRead(switchPin) == HIGH && state == LOW && lastState == LOW)
+    {
+      state = HIGH;
+      lastState = HIGH;
+    } 
+    else if (digitalRead(switchPin) == HIGH && state == HIGH)
+    {
+      state = LOW;
+    }
+    else if (digitalRead(switchPin) == LOW)
+    {
+      state = LOW;
+      lastState = LOW;
+    }
+  }
+};
+
+/*
+ * Gestion d'un bouton lumineux
+ * Paramètres pinLed, pinSwitch et on (durée laissée avant extinction) 
  */
 class BoutonLumineux
 {
@@ -104,10 +141,12 @@ class BoutonLumineux
   int ledState;
   int lastState;
   unsigned long previousMillisLed; 
+
 public:
   bool active = false;
   byte pointGagne;
-  BoutonLumineux(int pinLed, int pinSwitch, long on)
+  
+  void Initialisation(int pinSwitch, int pinLed, long on)
   {
     ledPin = pinLed;
     switchPin = pinSwitch;
@@ -119,62 +158,7 @@ public:
     ledState = LOW;
     previousMillisLed = 0;
     lastState = LOW;
-  }
-  void Update()
-  {
-    // Gestion de la Led
-    if (onTimeLed > 0)
-    {
-      unsigned long currentMillisLed = millis();
-      if ((ledState == HIGH) && (currentMillisLed - previousMillisLed >= onTimeLed))
-      {
-        ledState = LOW;
-        previousMillisLed = currentMillisLed;
-        digitalWrite(ledPin, ledState);
-      }
-      else if ((ledState == LOW) && (currentMillisLed - previousMillisLed >= offTimeLed))
-      {
-        ledState = HIGH;
-        previousMillisLed = currentMillisLed;
-        digitalWrite(ledPin, ledState);
-      }
-    }
-    else if (onTimeLed == 0)
-    {
-      ledState == LOW;
-      digitalWrite(ledPin, LOW);
-    }
-    else if (onTimeLed == -1)
-      {
-        ledState = HIGH;
-        digitalWrite(ledPin, HIGH);
-      }
-    
-    // Gestion du bouton
-    if ((digitalRead(switchPin) == HIGH) && (lastState == LOW))
-    {
-      if (DEBUG)
-      {
-        afficheur.setCursor(14,1);
-        afficheur.print(switchPin);
-      }
-      lastState = HIGH;
-      if (active)
-      {
-        onTimeLed = 0;
-        offTimeLed = 0;
-        active = false;
-        if (currentMillis - previousMillis <= onDelay)
-        {
-          pointGagne++;
-          lecteurAudio.playWithFileName(0x01, sonPointGagne);
-        }
-      }
-     } 
-     if (digitalRead(switchPin) == LOW)
-     {
-      lastState = LOW;
-     }
+    pointGagne = 0;
   }
   void ChangeParameters(long on)
   {
@@ -222,29 +206,89 @@ public:
     }
   Update();
   }
+
+private:
+  void Update()
+    {
+      // Gestion de la Led
+      if (onTimeLed > 0)
+      {
+        unsigned long currentMillisLed = millis();
+        if ((ledState == HIGH) && (currentMillisLed - previousMillisLed >= onTimeLed))
+        {
+          ledState = LOW;
+          previousMillisLed = currentMillisLed;
+          digitalWrite(ledPin, ledState);
+        }
+        else if ((ledState == LOW) && (currentMillisLed - previousMillisLed >= offTimeLed))
+        {
+          ledState = HIGH;
+          previousMillisLed = currentMillisLed;
+          digitalWrite(ledPin, ledState);
+        }
+      }
+      else if (onTimeLed == 0)
+      {
+        ledState == LOW;
+        digitalWrite(ledPin, LOW);
+      }
+      else if (onTimeLed == -1)
+        {
+          ledState = HIGH;
+          digitalWrite(ledPin, HIGH);
+        }
+      // Gestion du bouton
+      if ((digitalRead(switchPin) == HIGH) && (lastState == LOW))
+      {
+        if (DEBUG)
+        {
+          afficheur.setCursor(14,1);
+          afficheur.print(switchPin);
+        }
+        lastState = HIGH;
+        if (active)
+        {
+          onTimeLed = 0;
+          offTimeLed = 0;
+          active = false;
+          if (currentMillis - previousMillis <= onDelay)
+          {
+            pointGagne++;
+            lecteurAudio.playWithFileName(0x01, sonPointGagne);
+          }
+        }
+       } 
+       if (digitalRead(switchPin) == LOW)
+       {
+        lastState = LOW;
+       }
+    }
 };
 
-Flasher boutonStart(23, 300, 300);
-BoutonLumineux bouton1(25, 24, 3000);
-BoutonLumineux bouton2(27, 26, 3000);
-BoutonLumineux bouton3(29, 28, 3000);
-BoutonLumineux bouton4(31, 30, 3000);
-BoutonLumineux bouton5(33, 32, 3000);
-BoutonLumineux bouton6(35, 34, 3000);
-BoutonLumineux bouton7(37, 36, 3000);
-BoutonLumineux bouton8(39, 38, 3000);
-BoutonLumineux bouton9(41, 40, 3000);
-long voyant;
-int points;
+/*
+ * Déclarations des variables du programme
+ */
+Flasher ledBoutonStart(23, 300, 300);
+BoutonLumineux* bouton = new BoutonLumineux[9];
+Switch boutonStart(22);
+Switch boutonTempsMoins(30);
+Switch boutonTempsPlus(34);
+Switch boutonNiveauMoins(38);
+Switch boutonNiveauPlus(26);
+//Switch boutonMode(32);
+byte nombreAleatoire;
+int score = 0;
 int niveau = 3;
-int niveauEqu = trunc(185.71*sq(niveau)-2054.3*niveau+6370);
+long niveauEqu;
 bool menu = true;
 bool gameStarted;
-int lastState[50];
 unsigned long dureePartie = 60;
 unsigned long startTickCount;
 int temps;
 
+/*
+ * Affichage du menu général
+ */
 void AffichageMenu()
 {
   afficheur.clear();
@@ -260,131 +304,118 @@ void AffichageMenu()
   menu = true;
 }
 
-void setup() {
-  afficheur.begin(16, 2);
-  AffichageMenu();
-  pinMode(22, INPUT);
-  pinMode(30, INPUT);
-  pinMode(34, INPUT);
-  pinMode(26, INPUT);
-  pinMode(38, INPUT);  
-  randomSeed(analogRead(0));
-  delay(500);
-  lecteurAudio.setVolume(volume);
-  lecteurAudio.playWithFileName(0x01, sonAccueil);
+/*
+ * Calcul du score
+ */
+int CalculScore()
+{
+  return bouton[1].pointGagne + bouton[2].pointGagne + bouton[3].pointGagne + bouton[4].pointGagne + bouton[5].pointGagne + bouton[6].pointGagne + bouton[7].pointGagne + bouton[8].pointGagne + bouton[9].pointGagne;
 }
 
+/*
+ * Calcul du niveau équivalent pour les objets boutonLumineux
+ */
+long CalculNiveau(int niveau)
+{
+  return trunc(185.71*sq(niveau)-2054.3*niveau+6370);
+}
+
+/*
+ * Setup du programme ARDUINO
+ */
+void setup() {
+  niveauEqu = CalculNiveau(niveau);
+  // Inititialisation des 9 boutons lumineux
+  bouton[1].Initialisation(24, 25, niveauEqu);
+  bouton[2].Initialisation(26, 27, niveauEqu);
+  bouton[3].Initialisation(28, 29, niveauEqu);
+  bouton[4].Initialisation(30, 31, niveauEqu);
+  bouton[5].Initialisation(32, 33, niveauEqu);
+  bouton[6].Initialisation(34, 35, niveauEqu);
+  bouton[7].Initialisation(36, 37, niveauEqu);
+  bouton[8].Initialisation(38, 39, niveauEqu);
+  bouton[9].Initialisation(40, 41, niveauEqu);
+  // Initialisation de l'afficheur
+  afficheur.begin(16, 2);
+  AffichageMenu();
+  // Initialisation du générateur de nombres aléatoires
+  randomSeed(analogRead(0));
+  // Initialisation du son et lecture du son d'accueil
+  lecteurAudio.setVolume(volume);
+  lecteurAudio.playWithFileName(0x01, sonAccueil);
+  delay(1000);
+}
+
+/*
+ * Programme principal ARDUINO
+ */
 void loop() {
   
   if (gameStarted)
+  // Partie en cours
   {
-    if (not(bouton1.active || bouton2.active || bouton3.active || bouton4.active || bouton5.active || bouton6.active || bouton7.active || bouton8.active || bouton9.active))
+    if (not(bouton[1].active || bouton[2].active || bouton[3].active || bouton[4].active || bouton[5].active || bouton[6].active || bouton[7].active || bouton[8].active || bouton[9].active))
     {
-      voyant = random(1,10);
+      nombreAleatoire = random(1,10);
       if (DEBUG)
       {
         afficheur.setCursor(15,0);
-        afficheur.print(voyant);
+        afficheur.print(nombreAleatoire);
       }
-      switch (voyant)
-      {
-        case 1:
-          bouton1.Activate();
-          break;
-        case 2:
-          bouton2.Activate();
-          break;
-        case 3:
-          bouton3.Activate();
-          break;
-        case 4:
-          bouton4.Activate();
-          break;
-        case 5:
-          bouton5.Activate();
-          break;
-        case 6:
-          bouton6.Activate();
-          break;
-        case 7:
-          bouton7.Activate();
-          break;
-        case 8:
-          bouton8.Activate();
-          break;
-        case 9:
-          bouton9.Activate();
-          break;
-      }
+      bouton[nombreAleatoire].Activate();
     }
-  
-    bouton1.Show();
-    bouton2.Show();
-    bouton3.Show();
-    bouton4.Show();
-    bouton5.Show();
-    bouton6.Show();
-    bouton7.Show();
-    bouton8.Show();
-    bouton9.Show();
-  
-    points = bouton1.pointGagne + bouton2.pointGagne + bouton3.pointGagne + bouton4.pointGagne + bouton5.pointGagne + bouton6.pointGagne + bouton7.pointGagne + bouton8.pointGagne + bouton9.pointGagne;
+    for (int i=1; i<=9; i++)
+    {
+      bouton[i].Show();
+    }
+    score = CalculScore();
     temps = dureePartie -((millis() - startTickCount)/1000);
     if (temps <= 0)
     {
       gameStarted = false;
-      boutonStart.ChangeParameters(300, 300);
-      bouton1.Disable();
-      bouton2.Disable();
-      bouton3.Disable();
-      bouton4.Disable();
-      bouton5.Disable();
-      bouton6.Disable();
-      bouton7.Disable();
-      bouton8.Disable();
-      bouton9.Disable();
+      ledBoutonStart.ChangeParameters(300, 300);
+      for (int i=1; i<=9; i++)
+      {
+        bouton[i].Disable();
+      }
       lecteurAudio.playWithFileName(0x01, sonFin);
+      afficheur.setCursor(8,0);
+      afficheur.print(temps);
+      delay(3000);
     }
     afficheur.setCursor(8,1);
-    afficheur.print(points);
+    afficheur.print(score);
     afficheur.setCursor(8,0);
     afficheur.print(temps);
-    if (temps == 9) {afficheur.print(" ");}
+    if (temps == 9 || temps == 99) {afficheur.print("  ");}
   }
   else
   {
-    if ((digitalRead(22) == HIGH) && (lastState[22] == LOW))
+    // Gestion des paramètres avant démarrage d'une partie
+    
+    // Appui sur le bouton START
+    if (boutonStart.state == HIGH)
     {
-      lastState[22] = HIGH;
-      boutonStart.ChangeParameters(0, 0);
-      niveauEqu = trunc(185.71*sq(niveau)-2054.3*niveau+6370);
-      bouton1.ChangeParameters(niveauEqu);
-      bouton2.ChangeParameters(niveauEqu);
-      bouton3.ChangeParameters(niveauEqu);
-      bouton4.ChangeParameters(niveauEqu);
-      bouton5.ChangeParameters(niveauEqu);
-      bouton6.ChangeParameters(niveauEqu);
-      bouton7.ChangeParameters(niveauEqu);
-      bouton8.ChangeParameters(niveauEqu);
-      bouton9.ChangeParameters(niveauEqu);
+      ledBoutonStart.ChangeParameters(0, 0);
+      niveauEqu = CalculNiveau(niveau);
+      for (int i=1; i<=9; i++)
+      {
+        bouton[i].ChangeParameters(niveauEqu);
+      }
       afficheur.clear();
       afficheur.setCursor(0,0);
       afficheur.print("Temps =");
       afficheur.setCursor(0,1);
       afficheur.print("Score =");
       startTickCount = millis();
-      points = 0;
+      score = CalculScore();
       gameStarted = true;
       menu = false;
       lecteurAudio.playWithFileName(0x01, sonDepart);
-     } 
-    if (digitalRead(22) == LOW)
+    } 
+    // Appui sur le bouton TEMPS -
+    if (boutonTempsMoins.state == HIGH) 
     {
-      lastState[22] = LOW;
-    }  
-    if ((digitalRead(30) == HIGH) && (lastState[30] == LOW))
-    {
-      lastState[30] = HIGH;
       if (not(menu)) {AffichageMenu();}
       if (dureePartie >= 60 ) {dureePartie = dureePartie - 30;}
       afficheur.setCursor(6,1);
@@ -392,26 +423,18 @@ void loop() {
       afficheur.print(" ");
       lecteurAudio.playWithFileName(0x01, sonParametre);
     } 
-    if (digitalRead(30) == LOW)
+    // Appui sur le bouton TEMPS +
+    if (boutonTempsPlus.state == HIGH)
     {
-      lastState[30] = LOW;
-    }
-    if ((digitalRead(34) == HIGH) && (lastState[34] == LOW))
-    {
-      lastState[34] = HIGH;
       if (not(menu)) {AffichageMenu();}
       if (dureePartie <= 90 ) {dureePartie = dureePartie + 30;}
       afficheur.setCursor(6,1);
       afficheur.print(dureePartie);
       lecteurAudio.playWithFileName(0x01, sonParametre);
     } 
-    if (digitalRead(34) == LOW)
+    // Appui sur le bouton NIVEAU +
+    if (boutonNiveauPlus.state == HIGH)
     {
-      lastState[34] = LOW;
-    }
-    if ((digitalRead(26) == HIGH) && (lastState[26] == LOW))
-    {
-      lastState[26] = HIGH;
       if (not(menu)) {AffichageMenu();}
       if (niveau < 5 )
       {
@@ -421,13 +444,9 @@ void loop() {
         lecteurAudio.playWithFileName(0x01, sonParametre);
       }
     } 
-    if (digitalRead(26) == LOW)
+    // Appui sur le bouton NIVEAU -
+    if (boutonNiveauMoins.state == HIGH)
     {
-      lastState[26] = LOW;
-    }
-    if ((digitalRead(38) == HIGH) && (lastState[38] == LOW))
-    {
-      lastState[38] = HIGH;
       if (not(menu)) {AffichageMenu();}
       if (niveau > 1 )
       {
@@ -436,13 +455,16 @@ void loop() {
         afficheur.print(niveau);
         lecteurAudio.playWithFileName(0x01, sonParametre);
       }
-    } 
-    if (digitalRead(38) == LOW)
-    {
-      lastState[38] = LOW;
-    }          
+    }
+    // Mise à jour des boutons que lorsqu'une partie n'est pas démarrée
+    boutonStart.Update();
+    boutonTempsMoins.Update();
+    boutonTempsPlus.Update();
+    boutonNiveauMoins.Update();
+    boutonNiveauPlus.Update();          
   }
-  
-  boutonStart.Update();
+
+  // Mise à jour des LED
+  ledBoutonStart.Update();
   delay(20);
 }
