@@ -275,7 +275,8 @@ Switch boutonTempsMoins(30);
 Switch boutonTempsPlus(34);
 Switch boutonNiveauMoins(38);
 Switch boutonNiveauPlus(26);
-//Switch boutonMode(32);
+Switch boutonMode(32);
+byte selectionJeu = 0;
 byte nombreAleatoire;
 int score = 0;
 int niveau = 3;
@@ -289,18 +290,29 @@ int temps;
 /*
  * Affichage du menu général
  */
-void AffichageMenu()
+void AffichageMenu(byte jeu)
 {
   afficheur.clear();
-  afficheur.print("JEU DE REFLEXES");
-  afficheur.setCursor(0,1);
-  afficheur.print("Temps=");
-  afficheur.setCursor(6,1);
-  afficheur.print(dureePartie);
-  afficheur.setCursor(10,1);
-  afficheur.print("Niv=");
-  afficheur.setCursor(14,1);
-  afficheur.print(niveau);
+  if (jeu == 0)
+  {
+    afficheur.print("BATAK");
+    afficheur.setCursor(0,1);
+    afficheur.print("Temps=");
+    afficheur.setCursor(6,1);
+    afficheur.print(dureePartie);
+    afficheur.setCursor(10,1);
+    afficheur.print("Niv=");
+    afficheur.setCursor(14,1);
+    afficheur.print(niveau);
+  }
+  else if (jeu == 1)
+  {
+    afficheur.print("SIMON");
+    afficheur.setCursor(0,1);
+    afficheur.print("Niv=");
+    afficheur.setCursor(4,1);
+    afficheur.print(niveau);
+  }
   menu = true;
 }
 
@@ -337,7 +349,7 @@ void setup() {
   bouton[9].Initialisation(40, 41, niveauEqu);
   // Initialisation de l'afficheur
   afficheur.begin(16, 2);
-  AffichageMenu();
+  AffichageMenu(selectionJeu);
   // Initialisation du générateur de nombres aléatoires
   randomSeed(analogRead(0));
   // Initialisation du son et lecture du son d'accueil
@@ -354,45 +366,61 @@ void loop() {
   if (gameStarted)
   // Partie en cours
   {
-    if (not(bouton[1].active || bouton[2].active || bouton[3].active || bouton[4].active || bouton[5].active || bouton[6].active || bouton[7].active || bouton[8].active || bouton[9].active))
+    if (selectionJeu == 0)
+    // ++++++ Jeu de Batak ++++++
     {
-      nombreAleatoire = random(1,10);
-      if (DEBUG)
+      if (not(bouton[1].active || bouton[2].active || bouton[3].active || bouton[4].active || bouton[5].active || bouton[6].active || bouton[7].active || bouton[8].active || bouton[9].active))
       {
-        afficheur.setCursor(15,0);
-        afficheur.print(nombreAleatoire);
+        nombreAleatoire = random(1,10);
+        if (DEBUG)
+        {
+          afficheur.setCursor(15,0);
+          afficheur.print(nombreAleatoire);
+        }
+        bouton[nombreAleatoire].Activate();
       }
-      bouton[nombreAleatoire].Activate();
-    }
-    for (int i=1; i<=9; i++)
-    {
-      bouton[i].Show();
-    }
-    score = CalculScore();
-    temps = dureePartie -((millis() - startTickCount)/1000);
-    if (temps <= 0)
-    {
-      gameStarted = false;
-      ledBoutonStart.ChangeParameters(300, 300);
       for (int i=1; i<=9; i++)
       {
-        bouton[i].Disable();
+        bouton[i].Show();
       }
-      lecteurAudio.playWithFileName(0x01, sonFin);
-      afficheur.setCursor(8,0);
+      score = CalculScore();
+      temps = dureePartie -((millis() - startTickCount)/1000);
+      if (temps <= 0)
+      {
+        gameStarted = false;
+        ledBoutonStart.ChangeParameters(300, 300);
+        for (int i=1; i<=9; i++)
+        {
+          bouton[i].Disable();
+        }
+        lecteurAudio.playWithFileName(0x01, sonFin);
+        afficheur.setCursor(6,0);
+        afficheur.print(temps);
+        delay(3000);
+      }
+      afficheur.setCursor(6,1);
+      afficheur.print(score);
+      afficheur.setCursor(6,0);
       afficheur.print(temps);
-      delay(3000);
+      if (temps == 9 || temps == 99) {afficheur.print("  ");}
     }
-    afficheur.setCursor(8,1);
-    afficheur.print(score);
-    afficheur.setCursor(8,0);
-    afficheur.print(temps);
-    if (temps == 9 || temps == 99) {afficheur.print("  ");}
+    if (selectionJeu == 1)
+    // ++++++ Jeu de Simon ++++++
+    {
+      // Insérer le code du jeu de Simon
+    }
   }
   else
   {
     // Gestion des paramètres avant démarrage d'une partie
     
+    // Appui sur le bouton MODE JEU
+    if (boutonMode.state == HIGH)
+    {
+      if (selectionJeu == 0) {selectionJeu =1;} else {selectionJeu = 0;}
+      AffichageMenu(selectionJeu);
+      lecteurAudio.playWithFileName(0x01, sonDepart);
+    }
     // Appui sur le bouton START
     if (boutonStart.state == HIGH)
     {
@@ -404,9 +432,9 @@ void loop() {
       }
       afficheur.clear();
       afficheur.setCursor(0,0);
-      afficheur.print("Temps =");
+      afficheur.print("Temps=");
       afficheur.setCursor(0,1);
-      afficheur.print("Score =");
+      afficheur.print("Score=");
       startTickCount = millis();
       score = CalculScore();
       gameStarted = true;
@@ -416,7 +444,7 @@ void loop() {
     // Appui sur le bouton TEMPS -
     if (boutonTempsMoins.state == HIGH) 
     {
-      if (not(menu)) {AffichageMenu();}
+      if (not(menu)) {AffichageMenu(selectionJeu);}
       if (dureePartie >= 60 ) {dureePartie = dureePartie - 30;}
       afficheur.setCursor(6,1);
       afficheur.print(dureePartie);
@@ -426,7 +454,7 @@ void loop() {
     // Appui sur le bouton TEMPS +
     if (boutonTempsPlus.state == HIGH)
     {
-      if (not(menu)) {AffichageMenu();}
+      if (not(menu)) {AffichageMenu(selectionJeu);}
       if (dureePartie <= 90 ) {dureePartie = dureePartie + 30;}
       afficheur.setCursor(6,1);
       afficheur.print(dureePartie);
@@ -435,7 +463,7 @@ void loop() {
     // Appui sur le bouton NIVEAU +
     if (boutonNiveauPlus.state == HIGH)
     {
-      if (not(menu)) {AffichageMenu();}
+      if (not(menu)) {AffichageMenu(selectionJeu);}
       if (niveau < 5 )
       {
         niveau++;
@@ -447,7 +475,7 @@ void loop() {
     // Appui sur le bouton NIVEAU -
     if (boutonNiveauMoins.state == HIGH)
     {
-      if (not(menu)) {AffichageMenu();}
+      if (not(menu)) {AffichageMenu(selectionJeu);}
       if (niveau > 1 )
       {
         niveau--;
